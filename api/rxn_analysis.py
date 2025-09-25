@@ -4,11 +4,9 @@
 # @Email   : chengxiang.luo@foxmail.com
 # @File    : rxn_analysis.py
 # @Software: PyCharm
-from fastapi import FastAPI
 from indigo import Indigo, IndigoObject
 from indigo import inchi
 
-app = FastAPI()
 _indigo = Indigo()
 _inchi = inchi.IndigoInchi(_indigo)
 
