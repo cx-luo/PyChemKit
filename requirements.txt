@@ -1,0 +1,7 @@
+fastapi==0.105.0
+setuptools==60.2.0
+rdkit==2023.9.5
+requests==2.32.3
+lxml==5.1.0
+pydantic==2.11.7
+uvicorn~=0.22.0
