@@ -9,7 +9,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from api.rxn_analysis import rxn_analysis
-from chemical_book_utils.chemical_book_utils import get_info_from_chemical_book
 
 app = FastAPI()
 
