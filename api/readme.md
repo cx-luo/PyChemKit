@@ -63,3 +63,26 @@ def save_moldata(
     raise HttpException("Format %s is not supported" % output_format, 400)
 
 ```
+
+```python
+def automap(self, mode=""):
+    """Automatic reaction atom-to-atom mapping
+
+    Args:
+        mode (str): mode is one of the following (separated by a space):
+        "discard" : discards the existing mapping entirely and considers
+                    only the existing reaction centers (the default)
+        "keep"    : keeps the existing mapping and maps unmapped atoms
+        "alter"   : alters the existing mapping, and maps the rest of the
+                    reaction but may change the existing mapping
+        "clear"   : removes the mapping from the reaction.
+
+        "ignore_charges" : do not consider atom charges while searching
+        "ignore_isotopes" : do not consider atom isotopes while searching
+        "ignore_valence" : do not consider atom valence while searching
+        "ignore_radicals" : do not consider atom radicals while searching
+
+    Returns:
+        int: 1 if atom mapping is done without errors
+    """
+```

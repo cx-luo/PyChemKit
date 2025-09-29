@@ -4,6 +4,8 @@
 # @Email   : chengxiang.luo@foxmail.com
 # @File    : rxn_analysis.py
 # @Software: PyCharm
+from pprint import pprint
+from typing import Any
 
 from indigo import Indigo, IndigoObject
 from indigo import inchi
@@ -16,14 +18,14 @@ class Reactant:
     def __init__(self, obj: IndigoObject, role):
         self.hash = obj.hash()
         self.cml = obj.cml()
-        self.mw = round(obj.molecularWeight(), 3)
+        self.molecularWeight = round(obj.molecularWeight(), 3)
         self.monoisotopicMass = round(obj.monoisotopicMass(), 3)
         self.mostAbundantMass = round(obj.mostAbundantMass(), 3)
         self.canonicalSmiles = obj.canonicalSmiles()
         _indigo.setOption("smiles-saving-format", "daylight")
         self.smiles = obj.smiles()
         _indigo.setOption("smiles-saving-format", "chemaxon")
-        self.cxsmiles = obj.smiles()
+        self.cxSmiles = obj.smiles()
         self.isChiral = obj.isChiral()
         self.formula = obj.grossFormula().replace(' ', '', -1)
         self.inChI = _inchi.getInchi(obj)
@@ -32,72 +34,129 @@ class Reactant:
         self.stereoCentersCnt = obj.countStereocenters()
 
 
-def rxn_analysis(rxn_str):
+def rxn_analysis(rxn_str) -> dict[str, str | list[dict[str, Any]]]:
     rxn = _indigo.loadReaction(rxn_str)
+
+    # Collect SMILES and other formats efficiently
     _indigo.setOption("smiles-saving-format", "daylight")
     rxn_smiles = rxn.smiles()
     _indigo.setOption("smiles-saving-format", "chemaxon")
-    rxn_cxsmiles = rxn.smiles()
-    rxn_canonical_smiles = rxn.canonicalSmiles()
-    rxn_cd_xml = rxn.cdxml()
-    rxn_cml = rxn.cml()
-    rxn_reactants = rxn.iterateReactants()
-    rxn_products = rxn.iterateProducts()
-    rxn_molecules = rxn.iterateMolecules()
-    reactants_d = []
-    products_d = []
-    reagents_d = []
-    for reactant in rxn_reactants:
-        reactants_d.append(Reactant(reactant, 'reactant').__dict__)
+    rxn_cx_smiles = rxn.smiles()
 
-    for product in rxn_products:
-        products_d.append(Reactant(product, 'product').__dict__)
+    result = {
+        "smiles": rxn_smiles,
+        "cxSmiles": rxn_cx_smiles,
+        "rxnCml": rxn.cml(),
+        "rxnCdXml": rxn.cdxml(),
+    }
 
-    for molecule in rxn_molecules:
-        reagents_d.append(Reactant(molecule, 'reagent').__dict__)
+    # Helper to convert IndigoObject lists to Reactant dicts
+    def _to_dicts(objs, role):
+        return [Reactant(obj, role).__dict__ for obj in objs]
 
-    reagents_d = [p for p in reagents_d if p['inChiKey'] not in {r['inChiKey'] for r in reactants_d + products_d}]
+    result["reactants"] = _to_dicts(rxn.iterateReactants(), "reactant")
+    result["products"] = _to_dicts(rxn.iterateProducts(), "product")
+    result["reagents"] = _to_dicts(rxn.iterateCatalysts(), "reagent")
 
-    return {"rxnCanonicalSmiles": rxn_canonical_smiles, "smiles": rxn_smiles, "cxsmiles": rxn_cxsmiles, "rxnCml": rxn_cml,
-            "rxnCdXml": rxn_cd_xml, "reactants": reactants_d, "products": products_d, "reagents": reagents_d}
+    return result
 
 
-def rxn_serialize(rxn_str):
+def rxn_serialize(rxn_str) -> dict[str, str]:
+    """
+    Serialize a reaction string into various formats using Indigo.
+    Combines reactants and catalysts as reactants, then adds products.
+    Returns canonical SMILES, unmapped/mapped SMILES, CXSMILES, and CDXML.
+    """
     rxn = _indigo.loadReaction(rxn_str)
-    rxn_products = rxn.iterateProducts()
-    rxn_molecules = rxn.iterateMolecules()
-    products_d = [p for p in rxn_products]
-    molecules_d = [m for m in rxn_molecules]
-
-    while len(products_d) > 0:
-        products_hash = [p.hash() for p in products_d]
-        for i, hash in enumerate(products_hash):
-            for j, molecule in enumerate(molecules_d):
-                if molecule.hash() == hash:
-                    products_d.pop(i)
-                    molecules_d.pop(j)
-                    continue
+    # Collect all reactants and catalysts in one go
+    reactants = list(rxn.iterateReactants())
+    catalysts = list(rxn.iterateCatalysts())
+    products = list(rxn.iterateProducts())
 
     new_rxn = _indigo.createReaction()
-    _indigo.setOption("smiles-saving-format", "chemaxon")
+    for mol in (*reactants, *catalysts):
+        new_rxn.addReactant(mol)
+    for mol in products:
+        new_rxn.addProduct(mol)
 
-    for reactant in molecules_d:
-        new_rxn.addReactant(reactant)
-
-    rxn_products = rxn.iterateProducts()
-
-    for product in rxn_products:
-        new_rxn.addProduct(product)
-
-    rxn_canonical_smiles = new_rxn.canonicalSmiles()
-
+    # Unmapped
+    new_rxn.automap('clear')
     _indigo.setOption("smiles-saving-format", "daylight")
     rxn_smiles = new_rxn.smiles()
+    # rxn_canonical_smiles = new_rxn.canonicalSmiles()
 
     _indigo.setOption("smiles-saving-format", "chemaxon")
-    rxn_cxsmiles = new_rxn.smiles()
+    rxn_cx_smiles = new_rxn.smiles()
+    rxn_cd_xml = new_rxn.cdxml()
 
-    return {"rxnCanonicalSmiles": rxn_canonical_smiles, "smiles": rxn_smiles, "cxsmiles": rxn_cxsmiles}
+    # Mapped
+    new_rxn.automap('alter')
+    mapped_smiles = new_rxn.smiles()
+
+    return {
+        # "canonicalSmiles": rxn_canonical_smiles,
+        "smiles": rxn_smiles,
+        "cxSmiles": rxn_cx_smiles,
+        "rxnCdXml": rxn_cd_xml,
+        "mappedSmiles": mapped_smiles
+    }
+
+
+def rxn_canonicalize(rxn_str, sort_key="lex"):
+    """
+    Canonicalize a single reaction:
+      - clear atom mapping
+      - move agents -> reactants
+      - canonicalize each molecule
+      - sort reactants and products by SMILES or InChIKey
+      - return both SMILES and CXSMILES
+    """
+
+    rxn = _indigo.loadReaction(rxn_str)
+    rxn.automap("clear")
+
+    # Collect reactants + agents
+    reactants = [r for r in rxn.iterateReactants()] + [a for a in rxn.iterateCatalysts()]
+    products = [p for p in rxn.iterateProducts()]
+
+    # Precompute canonical SMILES and InChIKeys once
+    def prep_mols(mol_list):
+        mol_info = []
+        for mol in mol_list:
+            smi = mol.canonicalSmiles()
+            inchi_key = _inchi.getInchiKey(mol) if sort_key == "inchikey" else None
+            mol_info.append((smi, inchi_key))
+        return mol_info
+
+    reactant_info = prep_mols(reactants)
+    product_info = prep_mols(products)
+
+    # Sorting
+    def sort_info(info):
+        if sort_key == "inchikey":
+            return sorted(info, key=lambda x: (x[1], x[0]))  # tie-break with SMILES
+        else:
+            return sorted(info, key=lambda x: x[0])
+
+    reactant_info = sort_info(reactant_info)
+    product_info = sort_info(product_info)
+
+    # Build new reaction
+    new_rxn = _indigo.createReaction()
+    for smi, _ in reactant_info:
+        new_rxn.addReactant(_indigo.loadMolecule(smi))
+    for smi, _ in product_info:
+        new_rxn.addProduct(_indigo.loadMolecule(smi))
+
+    # Export
+    _indigo.setOption("smiles-saving-format", "chemaxon")
+    rxn_cx_smiles = new_rxn.smiles()
+
+    _indigo.setOption("smiles-saving-format", "daylight")
+    rxn_daylight_smiles = new_rxn.smiles()
+
+    _indigo.resetOptions()
+    return {"smiles": rxn_daylight_smiles, "cxSmiles": rxn_cx_smiles}
 
 
 if __name__ == '__main__':
@@ -105,13 +164,8 @@ if __name__ == '__main__':
         "[CH2:1]([S:3]([CH2:6][C:7]1[C:16](C(OC)=O)=[N+:15]([O-:21])[C:14]2[C:9](=[CH:10][CH:11]=[CH:12][CH:13]=2)[N+:8]=1[O-:22])(=["
         "O:5])=[O:4])[CH3:2]>[OH-].[Na+]>[CH2:1]([S:3]([CH2:6][C:7]1[CH:16]=[N+:15]([O-:21])[C:14]2[C:9](=[CH:10][CH:11]=[CH:12]["
         "CH:13]=2)[N+:8]=1[O-:22])(=[O:5])=[O:4])[CH3:2] |f:1.2|")
-
-    print(r['rxnCanonicalSmiles'])
-    print(r['smiles'])
-    print(r['cxsmiles'])
+    pprint(r)
     d = rxn_serialize(
-        "[CH2:1]([S:3]([CH2:6][C:7]1[C:16](C(OC)=O)=[N+:15]([O-:21])[C:14]2[C:9](=[CH:10][CH:11]=[CH:12][CH:13]=2)[N+:8]=1[O-:22])(=["
-        "O:5])=[O:4])[CH3:2]>[OH-].[Na+]>[CH2:1]([S:3]([CH2:6][C:7]1[CH:16]=[N+:15]([O-:21])[C:14]2[C:9](=[CH:10][CH:11]=[CH:12]["
-        "CH:13]=2)[N+:8]=1[O-:22])(=[O:5])=[O:4])[CH3:2] |f:1.2|")
+        "[CH2:1](O)[C:2]1[CH:7]=[CH:6][CH:5]=[CH:4][CH:3]=1.[CH3:9][N:10](C)[CH3:11]>[C]=O>[CH2:1]([N:10]([CH3:11])[CH3:9])[C:2]1[CH:7]=[CH:6][CH:5]=[CH:4][CH:3]=1 |^3:12|")
 
-    print(d['cxsmiles'])
+    pprint(d, width=120)

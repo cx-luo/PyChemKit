@@ -8,7 +8,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from api.rxn_analysis import rxn_analysis
+from api.rxn_analysis import rxn_analysis, rxn_serialize, rxn_canonicalize
 
 app = FastAPI()
 
@@ -17,17 +17,35 @@ class Reaction(BaseModel):
     smiles: str
 
 
-@app.post("/api/eln/rxnAnalysis")
-async def rxn_info(reaction: Reaction):
+@app.post("/api/rxn/analysis")
+async def analysis(reaction: Reaction):
     try:
         result = rxn_analysis(reaction.smiles)
-        return {"result": result}
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error parsing reaction: {e}")
+
+
+@app.post("/api/rxn/serialize")
+async def serialize(reaction: Reaction):
+    try:
+        result = rxn_serialize(reaction.smiles)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error parsing reaction: {e}")
+
+
+@app.post("/api/rxn/canonicalize")
+async def canonicalize(reaction: Reaction):
+    try:
+        result = rxn_canonicalize(reaction.smiles)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error parsing reaction: {e}")
 
 
 if __name__ == "__main__":
-    uvicorn.run(app='eln_runner:app', host="0.0.0.0", port=6030, reload=True)
+    uvicorn.run(app='cli:app', host="0.0.0.0", port=6030, reload=True)
     # get_density_from_chemical_book('96-49-1')
     # print(get_info_from_chemical_book('1,3-dioxolan-2-one'))
     # From SMILES
