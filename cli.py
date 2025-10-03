@@ -8,7 +8,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from api.rxn_analysis import rxn_analysis, rxn_serialize, rxn_canonicalize
+from api.rxn_analysis import rxn_analysis, rxn_serialize, rxn_canonicalize, rxn_uniquify
 
 app = FastAPI()
 
@@ -39,6 +39,15 @@ async def serialize(reaction: Reaction):
 async def canonicalize(reaction: Reaction):
     try:
         result = rxn_canonicalize(reaction.smiles)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error parsing reaction: {e}")
+
+
+@app.post("/api/rxn/uniquify")
+async def uniquify(reaction: Reaction):
+    try:
+        result = rxn_uniquify(reaction.smiles)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error parsing reaction: {e}")

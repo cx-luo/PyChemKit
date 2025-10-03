@@ -130,6 +130,7 @@ def rxn_canonicalize(rxn_str, sort_key="lex"):
 
     reactant_info = prep_mols(reactants)
     product_info = prep_mols(products)
+    product_cnt = len(products)
 
     # Sorting
     def sort_info(info):
@@ -155,8 +156,47 @@ def rxn_canonicalize(rxn_str, sort_key="lex"):
     _indigo.setOption("smiles-saving-format", "daylight")
     rxn_daylight_smiles = new_rxn.smiles()
 
+    rxn_hash = new_rxn.hash()
     _indigo.resetOptions()
-    return {"smiles": rxn_daylight_smiles, "cxSmiles": rxn_cx_smiles}
+
+    return {"smiles": rxn_daylight_smiles, "cxSmiles": rxn_cx_smiles, "productCnt": product_cnt, "rxnHash": rxn_hash}
+
+
+def rxn_uniquify(rxn_smiles):
+    # This function takes a reaction string, loads it as an Indigo reaction object,
+    # and then processes the reactants: A>B>C --> A.B>C
+    rxn = _indigo.loadReaction(rxn_smiles)
+    rxn_products = rxn.iterateProducts()
+    rxn_molecules = rxn.iterateMolecules()
+    products_d = [p for p in rxn_products]
+    molecules_d = [m for m in rxn_molecules]
+
+    while len(products_d) > 0:
+        products_hash = [p.hash() for p in products_d]
+        for i, hash_str in enumerate(products_hash):
+            for j, molecule in enumerate(molecules_d):
+                if molecule.hash() == hash_str:
+                    products_d.pop(i)
+                    molecules_d.pop(j)
+                    continue
+
+    new_rxn = _indigo.createReaction()
+    _indigo.setOption("smiles-saving-format", "chemaxon")
+
+    for reactant in molecules_d:
+        new_rxn.addReactant(reactant)
+
+    rxn_products = rxn.iterateProducts()
+
+    for product in rxn_products:
+        new_rxn.addProduct(product)
+
+    _indigo.setOption("smiles-saving-format", "chemaxon")
+    rxn_cx_smiles = new_rxn.smiles()
+
+    rxn_cd_xml = new_rxn.cdxml()
+
+    return {"cxSmiles": rxn_cx_smiles, "rxnCdXml": rxn_cd_xml}
 
 
 if __name__ == '__main__':
