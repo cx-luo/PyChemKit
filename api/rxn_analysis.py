@@ -110,6 +110,18 @@ def rxn_canonicalize(rxn_str, sort_key="lex"):
       - canonicalize each molecule
       - sort reactants and products by SMILES or InChIKey
       - return both SMILES and CXSMILES
+
+    Args:
+        rxn_str (str): Reaction string to canonicalize.
+        sort_key (str, optional): Sort key for reactants/products; "lex" for SMILES, "inchikey" for InChIKey. Default is "lex".
+
+    Returns:
+        dict: {
+            "smiles": Canonicalized Daylight SMILES,
+            "cxSmiles": Canonicalized ChemAxon CXSMILES,
+            "productCnt": Number of product molecules,
+            "rxnHash": Indigo hash of the canonicalized reaction
+        }
     """
 
     rxn = _indigo.loadReaction(rxn_str)
@@ -163,8 +175,20 @@ def rxn_canonicalize(rxn_str, sort_key="lex"):
 
 
 def rxn_uniquify(rxn_smiles):
-    # This function takes a reaction string, loads it as an Indigo reaction object,
-    # and then processes the reactants: A>B>C --> A.B>C
+    """
+    This function takes a reaction string, loads it as an Indigo reaction object,
+    and then processes the reactants so that sequential reactions like A>B>C are collapsed into a single reaction: A.B>C
+
+    Args:
+        rxn_smiles (str): A reaction SMILES string. Should represent possibly sequential reactions, such as A>B>C,
+                          that need to be merged/collapsed into a single canonical reaction.
+
+    Returns:
+        dict: A dictionary containing:
+            - "cxSmiles": (str) The reaction string in ChemAxon CXSMILES format.
+            - "rxnCdXml": (str) The reaction string in Indigo's CDXML format.
+    """
+
     rxn = _indigo.loadReaction(rxn_smiles)
     rxn_products = rxn.iterateProducts()
     rxn_molecules = rxn.iterateMolecules()
@@ -200,12 +224,16 @@ def rxn_uniquify(rxn_smiles):
 
 
 if __name__ == '__main__':
+    # Test reaction analysis
     r = rxn_analysis(
         "[CH2:1]([S:3]([CH2:6][C:7]1[C:16](C(OC)=O)=[N+:15]([O-:21])[C:14]2[C:9](=[CH:10][CH:11]=[CH:12][CH:13]=2)[N+:8]=1[O-:22])(=["
         "O:5])=[O:4])[CH3:2]>[OH-].[Na+]>[CH2:1]([S:3]([CH2:6][C:7]1[CH:16]=[N+:15]([O-:21])[C:14]2[C:9](=[CH:10][CH:11]=[CH:12]["
         "CH:13]=2)[N+:8]=1[O-:22])(=[O:5])=[O:4])[CH3:2] |f:1.2|")
+    print("=== Reaction Analysis ===")
     pprint(r)
+
+    # Test reaction serialization
     d = rxn_serialize(
         "[CH2:1](O)[C:2]1[CH:7]=[CH:6][CH:5]=[CH:4][CH:3]=1.[CH3:9][N:10](C)[CH3:11]>[C]=O>[CH2:1]([N:10]([CH3:11])[CH3:9])[C:2]1[CH:7]=[CH:6][CH:5]=[CH:4][CH:3]=1 |^3:12|")
-
+    print("\n=== Reaction Serialization ===")
     pprint(d, width=120)
