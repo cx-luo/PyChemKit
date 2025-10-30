@@ -6,3 +6,5 @@ lxml==5.1.0
 pydantic==2.11.7
 uvicorn~=0.22.0
 epam.indigo==1.16.0
+
+PubChemPy~=1.0.4

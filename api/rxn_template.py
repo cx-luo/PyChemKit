@@ -76,20 +76,20 @@ def rxn_get_template(rxn_str, template_type="smarts"):
             # Extract mapped atoms from reactants
             for mol in rxn.iterateReactants():
                 for atom in mol.iterateAtoms():
-                    if atom.mapping() > 0:
+                    if rxn.atomMappingNumber(atom) > 0:
                         mapping_info["mapped_atoms"].append({
                             "atom_index": atom.index(),
-                            "mapping_number": atom.mapping(),
+                            "mapping_number": rxn.atomMappingNumber(atom),
                             "role": "reactant"
                         })
 
             # Extract mapped atoms from products
             for mol in rxn.iterateProducts():
                 for atom in mol.iterateAtoms():
-                    if atom.mapping() > 0:
+                    if rxn.atomMappingNumber(atom) > 0:
                         mapping_info["mapped_atoms"].append({
                             "atom_index": atom.index(),
-                            "mapping_number": atom.mapping(),
+                            "mapping_number": rxn.atomMappingNumber(atom),
                             "role": "product"
                         })
 
